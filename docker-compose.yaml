@@ -1,0 +1,28 @@
+# Use postgres/example user/password credentials
+version: '3.1'
+
+services:
+
+  db:
+    image: postgres:14.10
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: cccat15
+    ports:
+      - 5432:5432
+    volumes:
+      - ./create.sql:/home/create.sql:ro
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+  node:
+    image: node-app
+    restart: always
+    volumes:
+      - ./:/app
+    ports:
+      - 3000:3000

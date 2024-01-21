@@ -3,57 +3,67 @@ import pgp from "pg-promise";
 import { validateCpf } from "./validateCpf";
 
 export async function signup (input: any): Promise<any> {
-	const connection = pgp()("postgres://postgres:123456@localhost:5432/app");
-	try {
-		const id = crypto.randomUUID();
-
-		const [acc] = await connection.query("select * from cccat15.account where email = $1", [input.email]);
-		if (!acc) {
-
-			if (input.name.match(/[a-zA-Z] [a-zA-Z]+/)) {
-				if (input.email.match(/^(.+)@(.+)$/)) {
-
-					if (validateCpf(input.cpf)) {
-						if (input.isDriver) {
-							if (input.carPlate.match(/[A-Z]{3}[0-9]{4}/)) {
-								await connection.query("insert into cccat15.account (account_id, name, email, cpf, car_plate, is_passenger, is_driver) values ($1, $2, $3, $4, $5, $6, $7)", [id, input.name, input.email, input.cpf, input.carPlate, !!input.isPassenger, !!input.isDriver]);
-								
-								const obj = {
-									accountId: id
-								};
-								return obj;
-							} else {
-								// invalid car plate
-								return -5;
-							}
-						} else {
-							await connection.query("insert into cccat15.account (account_id, name, email, cpf, car_plate, is_passenger, is_driver) values ($1, $2, $3, $4, $5, $6, $7)", [id, input.name, input.email, input.cpf, input.carPlate, !!input.isPassenger, !!input.isDriver]);
-
-							const obj = {
-								accountId: id
-							};
-							return obj;
-						}
-					} else {
-						// invalid cpf
-						return -1;
-					}
-				} else {
-					// invalid email
-					return -2;
-				}
-
-			} else {
-				// invalid name
-				return -3;
-			}
-
-		} else {
-			// already exists
-			return -4;
-		}
-
-	} finally {
-		await connection.$pool.end();
+	const id = crypto.randomUUID();
+	await emailExiste(input.email);
+	nomeEInvalido(input.name);
+	emailEInvalido(input.email);
+	cpfEInvalido(input.cpf);
+	
+	if (input.isDriver) {
+		placaDoCarroEInvalida(input.carPlate);
+		let dadosMotorista = await persistirMotorista(id, input);
+		return dadosMotorista;
+	} else {
+		let dadosPassageiro = await persistirPassageiro(id, input);
+		return dadosPassageiro;
 	}
+}
+
+async function emailExiste(email: string) {
+	const connection = pgp()("postgres://postgres:123456@db:5432/cccat15");
+	const [acc] = await connection.query("select * from cccat15.account where email = $1", [email]);
+	await connection.$pool.end();
+	if (acc) throw new Error("Already Exists");
+}
+
+function nomeEInvalido(name: string) {
+	if (!name.match(/[a-zA-Z] [a-zA-Z]+/)) throw new Error("Invalid Name")
+}
+
+function emailEInvalido(email: string) {
+	if (!email.match(/^(.+)@(.+)$/)) throw new Error("Invalid Email");
+}
+
+function cpfEInvalido(cpf: string) {
+	if (!validateCpf(cpf)) throw new Error("Invalid CPF");
+}
+
+function placaDoCarroEInvalida(carPlate: string) {
+	if (!carPlate.match(/[A-Z]{3}[0-9]{4}/)) throw new Error("Invalid Car Plate");
+}
+
+async function persistirMotorista(id: string, input: any) {
+	const connection = pgp()("postgres://postgres:123456@db:5432/cccat15");
+	await connection.query(
+		"insert into cccat15.account (account_id, name, email, cpf, car_plate, is_passenger, is_driver) values ($1, $2, $3, $4, $5, $6, $7)",
+		[id, input.name, input.email, input.cpf, input.carPlate, !!input.isPassenger, !!input.isDriver]
+	);
+	await connection.$pool.end();
+	const obj = {
+		accountId: id
+	};
+	return obj;
+}
+
+async function persistirPassageiro(id: string, input: any) {
+	const connection = pgp()("postgres://postgres:123456@db:5432/cccat15");
+	await connection.query(
+		"insert into cccat15.account (account_id, name, email, cpf, car_plate, is_passenger, is_driver) values ($1, $2, $3, $4, $5, $6, $7)",
+		[id, input.name, input.email, input.cpf, input.carPlate, !!input.isPassenger, !!input.isDriver]
+	);
+	await connection.$pool.end();
+	const obj = {
+		accountId: id
+	};
+	return obj;
 }
