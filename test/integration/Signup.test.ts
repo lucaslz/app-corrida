@@ -1,17 +1,20 @@
 import Sinon from "sinon";
-import { AccountDAO, AccountDAODatabase, AccountDAOInMemory } from "../src/AccountDAO";
-import GetAccount from "../src/GetAccount";
-import Signup from "../src/Signup";
-import MailerGateway from "../src/MailerGateway";
+import GetAccount from "../../src/application/usecase/GetAccount";
+import Signup from "../../src/application/usecase/Signup";
+import MailerGateway from "../../src/infra/gateway/MailerGateway";
+import { AccountRepository, AccountRepositoryDatabase } from "../../src/infra/repository/AccountRepository";
+import DatabaseConnection, { PgPromiseAdapter } from "../../src/infra/database/DatabaseConnection";
 
-let accountDao: AccountDAO;
+let accountRepository: AccountRepository;
 let signup: Signup;
 let getAccount: GetAccount;
+let connection: DatabaseConnection;
 
 beforeEach(() => {
-    accountDao = new AccountDAOInMemory();
-    signup = new Signup(accountDao);
-    getAccount = new GetAccount(accountDao);
+    connection = new PgPromiseAdapter();
+    accountRepository = new AccountRepositoryDatabase(connection);
+    signup = new Signup(accountRepository);
+    getAccount = new GetAccount(accountRepository);
 });
 
 test('Deve cadastrar uma nova conta', async() => {
@@ -30,7 +33,7 @@ test('Deve cadastrar uma nova conta', async() => {
     expect(outputGetAccount.name).toBe(input.name);
     expect(outputGetAccount.email).toBe(input.email);
     expect(outputGetAccount.cpf).toBe(input.cpf);
-    expect(outputGetAccount.is_passenger).toBe(input.isPassenger);
+    expect(outputGetAccount.isPassenger).toBe(input.isPassenger);
 
     expect(sendEmailSpy.calledOnce).toBe(true);
     expect(sendEmailSpy.calledWith('Welcome', input.email, 'Use this link to confirm your account')).toBe(true);
@@ -50,7 +53,7 @@ test('Deve cadastrar uma nova conta de motorista', async() => {
     expect(outputGetAccount.name).toBe(outputGetAccount.name);
     expect(outputGetAccount.email).toBe(input.email);
     expect(outputGetAccount.cpf).toBe(input.cpf);
-    expect(outputGetAccount.is_driver).toBe(input.isDriver);
+    expect(outputGetAccount.isDriver).toBe(input.isDriver);
 });
 
 test('Deve cadastrar uma nova conta de Passageiro', async() => {
@@ -113,8 +116,12 @@ test('A placa do carro deve ser inválida', async() => {
         name: 'Diego Vilar Laporte',
         email: `diego.laporte${Math.random()}@geradornv.com.br`,
         cpf: '314.215.150-83',
-        carPlate: 'MIY-6956',
+        carPlate: 'MIY-6956O',
         isDriver: true
     };
     await expect(() => signup.execute(input)).rejects.toThrow(new Error("Invalid Car Plate"));
+});
+
+afterEach(async () => {
+    await connection.close();
 });
